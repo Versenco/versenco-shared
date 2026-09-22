@@ -88,4 +88,10 @@ describe("createVCoinServerClient", () => {
     await client().getConfig("other_key");
     expect(fetchMock.mock.calls[0][0]).toBe("https://auth.versenco.com/functions/v1/vcoin-config?key=other_key");
   });
+
+  it("throws if constructed where `document` is defined (browser-like environment)", () => {
+    vi.stubGlobal("document", {});
+    expect(() => createVCoinServerClient({ appId: "a", clientSecret: "s", baseUrl: "https://x" })).toThrow(/browser/);
+    vi.unstubAllGlobals();
+  });
 });

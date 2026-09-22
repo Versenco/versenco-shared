@@ -8,5 +8,5 @@ export function idempotencyKey(...parts: string[]): string {
   if (parts.length === 0) {
     throw new Error("idempotencyKey requires at least one part");
   }
-  return parts.map((p) => p.replace(/_/g, "-")).join("_");
+  return parts.join("::");
 }

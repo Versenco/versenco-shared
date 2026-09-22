@@ -1,6 +1,10 @@
-import { VCoinNetworkError, type VCoinResult } from "./types";
+import { VCoinNetworkError, type VCoinBusinessError, type VCoinResult } from "./types";
 
 export function functionUrl(baseUrl: string, fn: string): string {
+  const isLocal = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(baseUrl);
+  if (!baseUrl.startsWith("https://") && !isLocal) {
+    throw new Error(`vCoin baseUrl must use https:// (got: ${baseUrl})`);
+  }
   return `${baseUrl.replace(/\/+$/, "")}/functions/v1/${fn}`;
 }
 
@@ -33,14 +37,21 @@ export async function vcoinFetch(
     throw new VCoinNetworkError("vCoin API returned a non-JSON response", res.status, err);
   }
 
+  if (json === null || typeof json !== "object" || Array.isArray(json)) {
+    throw new VCoinNetworkError("vCoin API returned a non-object JSON response", res.status);
+  }
+
   return { status: res.status, ok: res.ok, json };
 }
 
 export function genericErrorResult<T>(raw: VCoinRawResponse): VCoinResult<T> {
   const code = typeof raw.json.error === "string" ? raw.json.error : undefined;
   if (!code) {
+    if (raw.status === 401) {
+      return { ok: false, error: "invalid_token", detail: undefined };
+    }
     throw new VCoinNetworkError(`vCoin API returned ${raw.status} with no recognizable error code`, raw.status);
   }
   const detail = typeof raw.json.detail === "string" ? raw.json.detail : undefined;
-  return { ok: false, error: code, detail };
+  return { ok: false, error: code as VCoinBusinessError, detail };
 }

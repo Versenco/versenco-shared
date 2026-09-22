@@ -36,6 +36,16 @@ describe("toTransactionResult", () => {
     const r = toTransactionResult({ status: 404, ok: false, json: { error: "wallet_not_found" } });
     expect(r).toEqual({ ok: false, error: "wallet_not_found", detail: undefined });
   });
+
+  it("narrows to the insufficient_balance branch's extra fields (compile-time check)", () => {
+    const r = toTransactionResult({ status: 402, ok: false, json: { error: "insufficient_balance", balance: 5, required: 10 } });
+    if (!r.ok && r.error === "insufficient_balance") {
+      expect(r.balance).toBe(5);
+      expect(r.required).toBe(10);
+    } else {
+      throw new Error("expected insufficient_balance branch");
+    }
+  });
 });
 
 describe("toRefundResult", () => {
@@ -142,14 +152,14 @@ describe("toTransferResult", () => {
 
   it("maps daily_limit_exceeded", () => {
     const r = toTransferResult({
-      status: 200, ok: true,
+      status: 429, ok: false,
       json: { error: "daily_limit_exceeded", daily_sent: 1900, daily_limit: 2000, remaining: 100 },
     });
     expect(r).toEqual({ ok: false, error: "daily_limit_exceeded", dailySent: 1900, dailyLimit: 2000, remaining: 100 });
   });
 
   it("maps insufficient_balance on transfer", () => {
-    const r = toTransferResult({ status: 200, ok: true, json: { error: "insufficient_balance", balance: 1, required: 10 } });
+    const r = toTransferResult({ status: 402, ok: false, json: { error: "insufficient_balance", balance: 1, required: 10 } });
     expect(r).toEqual({ ok: false, error: "insufficient_balance", balance: 1, required: 10 });
   });
 });

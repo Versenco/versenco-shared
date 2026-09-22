@@ -109,8 +109,10 @@ export function toRecipientInfo(raw: VCoinRawResponse): VCoinResult<RecipientInf
 }
 
 export function toTransferResult(raw: VCoinRawResponse): VCoinResult<TransferResult> {
-  // vcoin-transfer returns business errors as HTTP 200 with an `error` field,
-  // unlike spend/refund — check the body's `error` before trusting `raw.ok`.
+  // vcoin-transfer's business errors use real HTTP status codes (402 for
+  // insufficient_balance, 429 for daily_limit_exceeded) — but we check
+  // raw.json.error before trusting raw.ok as defense in depth, since this
+  // endpoint's exact status-code contract isn't guaranteed stable.
   if (raw.json.error === "insufficient_balance") {
     return { ok: false, error: "insufficient_balance", balance: num(raw.json.balance), required: num(raw.json.required) };
   }

@@ -24,8 +24,7 @@ export type VCoinBusinessError =
   | "cannot_spend_for_other_user"
   | "admin_deduct_requires_server_credentials"
   | "config_not_found"
-  | "database_error"
-  | string;
+  | "database_error";
 
 export type VCoinResult<T> =
   | { ok: true; data: T }

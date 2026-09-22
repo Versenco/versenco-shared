@@ -19,6 +19,14 @@ describe("functionUrl", () => {
       "https://auth.versenco.com/functions/v1/vcoin-earn",
     );
   });
+
+  it("throws if baseUrl is not https (and not localhost)", () => {
+    expect(() => functionUrl("http://evil.example.com", "vcoin-earn")).toThrow(/https/);
+  });
+
+  it("allows http for localhost", () => {
+    expect(functionUrl("http://localhost:54321", "vcoin-earn")).toBe("http://localhost:54321/functions/v1/vcoin-earn");
+  });
 });
 
 describe("vcoinFetch", () => {
@@ -68,6 +76,11 @@ describe("vcoinFetch", () => {
       VCoinNetworkError,
     );
   });
+
+  it("throws VCoinNetworkError when the response body is valid JSON but not an object (e.g. an array or null)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("null", { status: 200 })));
+    await expect(vcoinFetch("https://x/y", { method: "GET", headers: {} })).rejects.toBeInstanceOf(VCoinNetworkError);
+  });
 });
 
 describe("genericErrorResult", () => {
@@ -91,5 +104,10 @@ describe("genericErrorResult", () => {
 
   it("throws VCoinNetworkError when the failed response has no error code", () => {
     expect(() => genericErrorResult({ status: 500, ok: false, json: {} })).toThrow(VCoinNetworkError);
+  });
+
+  it("maps a bare 401 (e.g. expired JWT rejected by the gateway) to invalid_token instead of throwing", () => {
+    const result = genericErrorResult({ status: 401, ok: false, json: {} });
+    expect(result).toEqual({ ok: false, error: "invalid_token", detail: undefined });
   });
 });

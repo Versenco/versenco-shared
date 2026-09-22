@@ -19,6 +19,12 @@ import type {
 } from "./types";
 
 export function createVCoinServerClient(config: VCoinServerConfig): VCoinServerClient {
+  if (typeof document !== "undefined") {
+    throw new Error(
+      "createVCoinServerClient must never run in a browser — it holds a secret. Use createVCoinUserClient for browser code.",
+    );
+  }
+
   async function earn(input: EarnInput): Promise<VCoinResult<TransactionResult>> {
     const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-earn"), {
       method: "POST",

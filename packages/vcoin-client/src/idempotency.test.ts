@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { idempotencyKey } from "./idempotency";
 
 describe("idempotencyKey", () => {
-  it("joins parts with underscores", () => {
-    expect(idempotencyKey("upload", "doc123", "user456")).toBe("upload_doc123_user456");
+  it("joins parts with a double-colon separator", () => {
+    expect(idempotencyKey("upload", "doc123", "user456")).toBe("upload::doc123::user456");
   });
 
   it("is deterministic for the same input", () => {

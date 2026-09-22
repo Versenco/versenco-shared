@@ -16,7 +16,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -31,6 +31,12 @@ jobs:
 
       - run: pnpm --filter @versenco/vcoin-client build
 
+      # NPM_TOKEN must be a Granular Access Token with write access to the
+      # @versenco scope, generated at npmjs.com (classic "Automation" tokens
+      # no longer exist — npm revoked them 2025-12-09). Granular write tokens
+      # expire after at most 90 days and must be rotated manually; this repo
+      # is public, so `--provenance` works without needing full OIDC trusted
+      # publishing (which has an open pnpm bug as of 2026: pnpm/pnpm#11513).
       - name: Publish
         working-directory: packages/vcoin-client
         run: pnpm publish --access public --provenance --no-git-checks
