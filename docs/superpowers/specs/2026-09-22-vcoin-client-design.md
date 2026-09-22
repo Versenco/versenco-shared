@@ -10,10 +10,25 @@ vrai risque de fuite du secret serveur si dupliqué sans discipline.
 
 ## 1. Objectif et périmètre
 
-Un package TypeScript installable en dépendance git (`@versenco/vcoin-client`)
-qui encapsule tous les appels aux edge functions `vcoin-*` de versen-connect,
-avec une séparation structurelle entre les opérations serveur-à-serveur
-(secret d'app) et les opérations côté utilisateur (JWT).
+Un package TypeScript **public sur npm** (`@versenco/vcoin-client`) qui
+encapsule tous les appels aux edge functions `vcoin-*` de versen-connect, avec
+une séparation structurelle entre les opérations serveur-à-serveur (secret
+d'app) et les opérations côté utilisateur (JWT).
+
+**Public dès la v1, par choix, pas par défaut.** L'objectif final n'est pas
+seulement d'arrêter la duplication interne : c'est que des développeurs
+externes puissent un jour intégrer le SSO, vCoin (« payer avec vCoin »),
+vCaptcha et les futurs emplacements pub VersenAds dans **leurs propres apps**
+— comme on intègre un SDK Stripe ou Auth0. `vcoin-client` est le premier
+package construit dans cette optique : rien dans son design ne suppose un
+consommateur « de confiance » interne à Versenco (voir §3 — aucune méthode
+n'embarque de secret qui ne soit pas fourni explicitement par l'appelant).
+
+Publier le SDK maintenant **n'ouvre pas l'accès à l'API** : `vcoin-earn` /
+`vcoin-spend` / `vcoin-refund` continuent d'exiger un `client_secret`
+provisionné à la main par un admin versen-connect (comme aujourd'hui). Un dev
+externe intéressé demande un accès, comme une clé API en bêta privée — aucun
+changement côté versen-connect n'est nécessaire pour publier ce package.
 
 **Périmètre v1** : uniquement `vcoin-client`. Pas de SSO, pas de vCaptcha dans
 ce repo pour l'instant — ils rejoindront `versenco-shared` dans des plans
@@ -23,8 +38,10 @@ package et sa documentation d'intégration, la migration est un travail à part.
 
 ## 2. Repo et distribution
 
-- Nouveau repo **`versenco-shared`**, GitHub privé, séparé de `SSO/` (doit
-  être consommable par des repos hors `SSO/`, comme VersenEducation).
+- Nouveau repo **`versenco-shared`**, GitHub — **le code source du repo peut
+  rester privé** (aucune obligation de l'ouvrir), seul le **package publié
+  sur npm** est public. Séparé de `SSO/` (doit être consommable par des repos
+  hors `SSO/`, comme VersenEducation, et à terme par des devs externes).
 - **Workspace pnpm** dès la v1, prêt à accueillir de futurs packages sans
   réorganisation :
   ```
@@ -33,29 +50,38 @@ package et sa documentation d'intégration, la migration est un travail à part.
     package.json                # racine, private: true, jamais publié
     packages/
       vcoin-client/
-        package.json            # "name": "@versenco/vcoin-client"
+        package.json            # "name": "@versenco/vcoin-client", publishConfig.access: "public"
         src/
-        dist/                   # buildé, committé (voir §2.1)
+        dist/                   # buildé (voir §2.1)
+        README.md                # doc publique — un dev externe la lit en premier
+        LICENSE                  # MIT (ou équivalent) — requis pour un package public utilisable par des tiers
         vitest.config.ts
   ```
-- **§2.1 — `dist/` committé.** Une dépendance git n'exécute pas de script de
-  build à l'installation, et Next/Vite ne transpilent pas du TS venant de
-  `node_modules`. Le package build donc en ESM + CJS + `.d.ts` (tsup) et
-  committe le résultat dans `dist/`. Un hook / CI vérifie que `dist/` est à
-  jour par rapport à `src/` (§7).
-- **Versionnage** : tags git `vcoin-client@X.Y.Z`, un `CHANGELOG.md` par
-  package tenu à la main (pas d'outillage changesets — un seul package, un
-  seul mainteneur, YAGNI).
+- **§2.1 — Build.** `tsup` en ESM + CJS + `.d.ts`. Un `pnpm publish` construit
+  et envoie `dist/` au registre — `dist/` n'a pas besoin d'être committé dans
+  git (contrairement à une distribution en dépendance git) ; `.gitignore`
+  l'exclut, `.npmignore`/`files` dans `package.json` contrôle ce qui part sur
+  npm (`dist/`, `README.md`, `LICENSE`, pas `src/`).
+- **Scope npm** : `@versenco` — à réserver (créer l'organisation npm)
+  **avant** la première publication, pour sécuriser le nom pour les 3 autres
+  packages prévus (SSO, vCaptcha, ads). Vérifié en amont de cette spec :
+  aucun package n'existe encore sous ce scope.
+- **Versionnage** : semver strict — des inconnus épinglent des versions,
+  un breaking change mal versionné casse leur prod. Tags git
+  `vcoin-client@X.Y.Z`, `CHANGELOG.md` par package tenu à la main (pas
+  d'outillage changesets — un seul package, un seul mainteneur, YAGNI).
+- **Publish** : `pnpm publish --access public` depuis `packages/vcoin-client`,
+  automatisé en CI sur push de tag (§9), avec provenance npm (OIDC GitHub
+  Actions) pour donner à un consommateur externe un signal de build vérifiable
+  — pertinent pour un SDK qui touche à de la monnaie.
 - **Consommation** :
   ```json
   "dependencies": {
-    "@versenco/vcoin-client": "github:<org>/versenco-shared#vcoin-client@0.1.0"
+    "@versenco/vcoin-client": "^0.1.0"
   }
   ```
-  Si pnpm ne sait pas installer un sous-répertoire d'un repo git multi-package
-  de cette manière (à vérifier concrètement en tâche 1 du plan), repli documenté :
-  un submodule/miroir git ne contenant que `packages/vcoin-client` poussé par
-  CI sur un tag, consommé de la même façon.
+  Rien de spécifique à Versenco côté consommateur — un `pnpm add
+  @versenco/vcoin-client` standard, identique à n'importe quel package public.
 
 ## 3. Les deux domaines de confiance
 
@@ -255,8 +281,10 @@ longueur raisonnable. Remplace les formats ad-hoc actuels
 ## 9. CI
 
 GitHub Action sur push de tag `vcoin-client@*` : installe, lint, teste,
-build, puis vérifie que `git diff --exit-code packages/vcoin-client/dist`
-après build (le `dist/` committé doit être à jour). Pas de publish npm.
+build, puis `pnpm publish --access public --provenance` (nécessite un token
+npm avec droits de publication sur l'org `@versenco`, stocké en secret
+GitHub Actions ; provenance via OIDC — pas de token longue durée à gérer côté
+CI pour la signature). Un run qui échoue aux tests ne publie pas.
 
 ## 10. Exemple de consommation (documentation, pas du code livré ici)
 
@@ -283,11 +311,15 @@ if (!result.ok) { /* gérer selon result.error */ }
 - SSO et vCaptcha dans `versenco-shared` — plans séparés, plus tard.
 - Migration des apps consommatrices existantes (VersenEducation, versen-pay,
   sovereign-connect) — travail séparé, une fois le package publié.
-- Publish sur un registre npm (privé ou public) — dépendance git suffit v1.
+- Portail self-serve pour que des devs externes obtiennent eux-mêmes un
+  `client_secret` — reste un provisioning manuel par un admin versen-connect,
+  comme pour les apps maison aujourd'hui (voir §1).
 - Retry automatique / backoff sur `VCoinNetworkError` — l'appelant décide.
 - Validation de schéma runtime (zod) sur les réponses serveur — les types
   TS suffisent pour la confiance qu'on a dans versen-connect comme source ;
   à reconsidérer si versen-connect change sans coordination.
+- Documentation publique complète (site de docs, guides par langage/framework)
+  — v1 se limite à un `README.md` correct dans le package.
 
 ## 12. Prochaines étapes
 
