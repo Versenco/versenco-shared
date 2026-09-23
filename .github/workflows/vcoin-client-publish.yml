@@ -32,14 +32,20 @@ jobs:
 
       - run: pnpm --filter @versenco/vcoin-client build
 
-      # NPM_TOKEN must be a Granular Access Token with write access to the
-      # @versenco scope, generated at npmjs.com (classic "Automation" tokens
-      # no longer exist — npm revoked them 2025-12-09). Granular write tokens
-      # expire after at most 90 days and must be rotated manually; this repo
-      # is public, so `--provenance` works without needing full OIDC trusted
-      # publishing (which has an open pnpm bug as of 2026: pnpm/pnpm#11513).
-      - name: Publish
+      # npm now refuses direct publishes from this token (E_STAGE_REQUIRED):
+      # NPM_TOKEN is a Granular Access Token with "Read and write (stage only)",
+      # so CI can only STAGE a version. The version goes live once a maintainer
+      # approves it with 2FA — on npmjs.com, or from a terminal:
+      #   npm stage list @versenco/vcoin-client
+      #   npm stage approve <stage-id> --otp <code>
+      # Granular write tokens expire after at most 90 days (rotate by hand).
+      # `npm stage` needs npm >= 11.15, newer than the npm bundled with Node 22,
+      # and pnpm has no equivalent command, so the npm CLI does this step.
+      - name: Upgrade npm (staged publishing needs >= 11.15)
+        run: npm install -g "npm@^11.15.0"
+
+      - name: Stage for approval
         working-directory: packages/vcoin-client
-        run: pnpm publish --access public --provenance --no-git-checks
+        run: npm stage publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
