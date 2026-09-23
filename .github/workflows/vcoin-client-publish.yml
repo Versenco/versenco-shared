@@ -14,13 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm version is read from package.json's "packageManager" field —
+      # do not also set `version` here, pnpm/action-setup refuses to run
+      # when both are specified (ERR_PNPM_BAD_PM_VERSION).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
 
       - run: pnpm install --frozen-lockfile
