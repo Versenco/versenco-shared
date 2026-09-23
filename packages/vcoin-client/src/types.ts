@@ -35,7 +35,7 @@ export type VCoinResult<T> =
 
 // ── Earn / spend ──────────────────────────────────────────────────────────
 
-export type EarnType = "upload_reward" | "welcome_bonus" | "admin_grant" | "referral";
+export type EarnType = "upload_reward" | "welcome_bonus" | "admin_grant" | "referral" | "report_resolved";
 export type SpendType = "document_purchase" | "decoration" | "payment" | "admin_deduct";
 
 export interface EarnInput {
@@ -135,10 +135,14 @@ export interface VCoinServerConfig {
   appId: string;
   clientSecret: string;
   baseUrl: string;
+  /** Per-request timeout in milliseconds (default 30000). On expiry a VCoinNetworkError is thrown. */
+  timeoutMs?: number;
 }
 
 export interface VCoinUserConfig {
   baseUrl: string;
+  /** Per-request timeout in milliseconds (default 30000). On expiry a VCoinNetworkError is thrown. */
+  timeoutMs?: number;
 }
 
 export interface VCoinServerClient {

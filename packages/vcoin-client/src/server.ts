@@ -1,4 +1,4 @@
-import { functionUrl, vcoinFetch } from "./fetcher";
+import { functionUrl, resolveTimeoutMs, vcoinFetch, type VCoinRequestInit } from "./fetcher";
 import {
   toBalanceResult,
   toConfigResult,
@@ -25,8 +25,11 @@ export function createVCoinServerClient(config: VCoinServerConfig): VCoinServerC
     );
   }
 
+  const timeoutMs = resolveTimeoutMs(config.timeoutMs);
+  const request = (url: string, init: VCoinRequestInit) => vcoinFetch(url, { ...init, timeoutMs });
+
   async function earn(input: EarnInput): Promise<VCoinResult<TransactionResult>> {
-    const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-earn"), {
+    const raw = await request(functionUrl(config.baseUrl, "vcoin-earn"), {
       method: "POST",
       headers: { "x-vcoin-secret": config.clientSecret },
       body: {
@@ -43,7 +46,7 @@ export function createVCoinServerClient(config: VCoinServerConfig): VCoinServerC
   }
 
   async function spend(input: SpendInput): Promise<VCoinResult<TransactionResult>> {
-    const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-spend"), {
+    const raw = await request(functionUrl(config.baseUrl, "vcoin-spend"), {
       method: "POST",
       headers: { "x-vcoin-secret": config.clientSecret },
       body: {
@@ -60,7 +63,7 @@ export function createVCoinServerClient(config: VCoinServerConfig): VCoinServerC
   }
 
   async function refund(input: RefundInput): Promise<VCoinResult<RefundResult>> {
-    const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-refund"), {
+    const raw = await request(functionUrl(config.baseUrl, "vcoin-refund"), {
       method: "POST",
       headers: { "x-vcoin-secret": config.clientSecret },
       body: { transaction_id: input.transactionId, reason: input.reason, app_id: config.appId },
@@ -70,7 +73,7 @@ export function createVCoinServerClient(config: VCoinServerConfig): VCoinServerC
 
   async function balance(input: { userId: string }): Promise<VCoinResult<BalanceResult>> {
     const url = `${functionUrl(config.baseUrl, "vcoin-balance")}?user_id=${encodeURIComponent(input.userId)}`;
-    const raw = await vcoinFetch(url, {
+    const raw = await request(url, {
       method: "GET",
       headers: { "x-vcoin-secret": config.clientSecret, "x-app-id": config.appId },
     });
@@ -79,7 +82,7 @@ export function createVCoinServerClient(config: VCoinServerConfig): VCoinServerC
 
   async function getConfig(key?: string): Promise<VCoinResult<ConfigResult>> {
     const qs = key ? `?key=${encodeURIComponent(key)}` : "";
-    const raw = await vcoinFetch(`${functionUrl(config.baseUrl, "vcoin-config")}${qs}`, {
+    const raw = await request(`${functionUrl(config.baseUrl, "vcoin-config")}${qs}`, {
       method: "GET",
       headers: {},
     });

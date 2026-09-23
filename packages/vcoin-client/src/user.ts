@@ -1,4 +1,4 @@
-import { functionUrl, vcoinFetch } from "./fetcher";
+import { functionUrl, resolveTimeoutMs, vcoinFetch, type VCoinRequestInit } from "./fetcher";
 import { toBalanceResult, toCheckoutResult, toRecipientInfo, toTransferResult } from "./mappers";
 import type {
   BalanceResult,
@@ -11,8 +11,11 @@ import type {
 } from "./types";
 
 export function createVCoinUserClient(config: VCoinUserConfig): VCoinUserClient {
+  const timeoutMs = resolveTimeoutMs(config.timeoutMs);
+  const request = (url: string, init: VCoinRequestInit) => vcoinFetch(url, { ...init, timeoutMs });
+
   async function balance(input: { accessToken: string }): Promise<VCoinResult<BalanceResult>> {
-    const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-balance"), {
+    const raw = await request(functionUrl(config.baseUrl, "vcoin-balance"), {
       method: "GET",
       headers: { Authorization: `Bearer ${input.accessToken}` },
     });
@@ -23,7 +26,7 @@ export function createVCoinUserClient(config: VCoinUserConfig): VCoinUserClient 
     accessToken: string;
     recipient: string;
   }): Promise<VCoinResult<RecipientInfo>> {
-    const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-transfer"), {
+    const raw = await request(functionUrl(config.baseUrl, "vcoin-transfer"), {
       method: "POST",
       headers: { Authorization: `Bearer ${input.accessToken}` },
       body: { action: "verify", recipient: input.recipient },
@@ -32,7 +35,7 @@ export function createVCoinUserClient(config: VCoinUserConfig): VCoinUserClient 
   }
 
   async function transfer(input: TransferInput): Promise<VCoinResult<TransferResult>> {
-    const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-transfer"), {
+    const raw = await request(functionUrl(config.baseUrl, "vcoin-transfer"), {
       method: "POST",
       headers: { Authorization: `Bearer ${input.accessToken}` },
       body: {
@@ -50,7 +53,7 @@ export function createVCoinUserClient(config: VCoinUserConfig): VCoinUserClient 
     accessToken: string;
     packId: string;
   }): Promise<VCoinResult<{ checkoutUrl: string }>> {
-    const raw = await vcoinFetch(functionUrl(config.baseUrl, "vcoin-create-checkout"), {
+    const raw = await request(functionUrl(config.baseUrl, "vcoin-create-checkout"), {
       method: "POST",
       headers: { Authorization: `Bearer ${input.accessToken}` },
       body: { pack_id: input.packId },

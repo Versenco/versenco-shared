@@ -21,22 +21,54 @@ export interface VCoinRawResponse {
   json: Record<string, unknown>;
 }
 
-export async function vcoinFetch(
-  url: string,
-  init: { method: "GET" | "POST"; headers: Record<string, string>; body?: unknown },
-): Promise<VCoinRawResponse> {
+export const DEFAULT_TIMEOUT_MS = 30_000;
+
+// Validated up front: setTimeout treats Infinity/NaN/0 as "fire immediately",
+// which would turn a config typo into every request failing.
+export function resolveTimeoutMs(timeoutMs: number | undefined): number {
+  if (timeoutMs === undefined) return DEFAULT_TIMEOUT_MS;
+  if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error(`vCoin timeoutMs must be a positive, finite number of milliseconds (got: ${String(timeoutMs)})`);
+  }
+  return timeoutMs;
+}
+
+export interface VCoinRequestInit {
+  method: "GET" | "POST";
+  headers: Record<string, string>;
+  body?: unknown;
+  timeoutMs?: number;
+}
+
+export async function vcoinFetch(url: string, init: VCoinRequestInit): Promise<VCoinRawResponse> {
+  const timeoutMs = init.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
   let res: Response;
+  let text: string;
   try {
     res = await fetch(url, {
       method: init.method,
       headers: { "Content-Type": "application/json", ...init.headers },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: controller.signal,
     });
+    // The timer must cover the body too: a server can send headers then stall.
+    text = await res.text();
   } catch (err) {
+    if (timedOut) {
+      throw new VCoinNetworkError(`vCoin API request timed out after ${timeoutMs}ms`, undefined, err);
+    }
     throw new VCoinNetworkError("Network error calling the vCoin API", undefined, err);
+  } finally {
+    clearTimeout(timer);
   }
 
-  const text = await res.text();
   let json: Record<string, unknown>;
   try {
     json = text.length > 0 ? JSON.parse(text) : {};

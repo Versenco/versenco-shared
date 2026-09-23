@@ -103,6 +103,26 @@ keyspace at the database level — so always include your own app id (or an
 equally unique prefix) as one of the parts you pass in, to avoid colliding
 with another app's key.
 
+Whether you must pass one depends on the method: it is **optional** on
+`earn` and `spend`, and **required** on `transfer` (the API rejects a
+transfer without it). Optional does not mean harmless to skip — without a
+key, a retried `earn` or `spend` (after a timeout, say) is applied twice.
+Pass one for anything you might retry.
+
+## Timeouts
+
+Every request times out after 30 seconds by default. Set `timeoutMs` in
+either client's config to change it; it must be a positive, finite number.
+When it expires the call throws a `VCoinNetworkError`.
+
+```ts
+const vcoin = createVCoinServerClient({ appId, clientSecret, baseUrl, timeoutMs: 10_000 });
+```
+
+Note that a timeout says nothing about whether the server applied the
+request — which is one more reason to send an `idempotencyKey` on `earn`
+and `spend`.
+
 ## Errors
 
 Two different failure shapes:

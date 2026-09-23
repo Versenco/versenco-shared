@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe("package exports", () => {
   it("exposes the version constant", () => {
-    expect(VCOIN_CLIENT_VERSION).toBe("0.1.0");
+    expect(VCOIN_CLIENT_VERSION).toBe("0.2.0");
   });
 });
 
