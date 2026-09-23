@@ -17,4 +17,13 @@ describe("idempotencyKey", () => {
   it("throws if called with no parts", () => {
     expect(() => idempotencyKey()).toThrow(/at least one part/);
   });
+
+  it("throws if a part contains the separator, to prevent cross-call collisions", () => {
+    expect(() => idempotencyKey("a::b", "c")).toThrow(/::/);
+  });
+
+  it("does not let a part containing the separator silently collide with a different split", () => {
+    // Without the guard, idempotencyKey("a::b", "c") would equal idempotencyKey("a", "b::c").
+    expect(() => idempotencyKey("a", "b::c")).toThrow(/::/);
+  });
 });

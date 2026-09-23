@@ -27,6 +27,16 @@ describe("functionUrl", () => {
   it("allows http for localhost", () => {
     expect(functionUrl("http://localhost:54321", "vcoin-earn")).toBe("http://localhost:54321/functions/v1/vcoin-earn");
   });
+
+  it("does not treat a lookalike hostname like localhost.evil.com as local", () => {
+    // A prefix-only regex check would incorrectly allow this and send the
+    // secret over plain HTTP to an attacker-controlled domain.
+    expect(() => functionUrl("http://localhost.evil.com", "vcoin-earn")).toThrow(/https/);
+  });
+
+  it("throws for a malformed baseUrl", () => {
+    expect(() => functionUrl("not a url", "vcoin-earn")).toThrow(/valid URL/);
+  });
 });
 
 describe("vcoinFetch", () => {

@@ -1,8 +1,15 @@
 import { VCoinNetworkError, type VCoinBusinessError, type VCoinResult } from "./types";
 
 export function functionUrl(baseUrl: string, fn: string): string {
-  const isLocal = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(baseUrl);
-  if (!baseUrl.startsWith("https://") && !isLocal) {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error(`vCoin baseUrl must be a valid URL (got: ${baseUrl})`);
+  }
+  const isLocal =
+    parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1");
+  if (parsed.protocol !== "https:" && !isLocal) {
     throw new Error(`vCoin baseUrl must use https:// (got: ${baseUrl})`);
   }
   return `${baseUrl.replace(/\/+$/, "")}/functions/v1/${fn}`;

@@ -8,5 +8,12 @@ export function idempotencyKey(...parts: string[]): string {
   if (parts.length === 0) {
     throw new Error("idempotencyKey requires at least one part");
   }
+  for (const part of parts) {
+    if (part.includes("::")) {
+      throw new Error(
+        'idempotencyKey parts must not contain "::" (the separator) — this would let two different calls silently collide',
+      );
+    }
+  }
   return parts.join("::");
 }
