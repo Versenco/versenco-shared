@@ -634,14 +634,14 @@ git commit -m "test(sso): add fake OIDC provider for attack-path tests" -m "Co-A
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createSso, type Sso } from "./index";
-import { FakeProvider } from "./test-support/fake-provider";
+import { createSso, type Sso, type SsoConfig } from "./index";
+import { FakeProvider, type TokenOverrides } from "./test-support/fake-provider";
 
 const REDIRECT = "http://localhost:3000/auth/callback";
 let provider: FakeProvider;
 let sso: Sso;
 
-function makeSso(patch: Record<string, unknown> = {}): Sso {
+function makeSso(patch: Partial<SsoConfig> = {}): Sso {
   return createSso({ issuer: provider.issuer, clientId: "app", clientSecret: "secret", redirectUri: REDIRECT, ...patch });
 }
 
@@ -750,7 +750,7 @@ describe("handleCallback: token endpoint attacks", () => {
 });
 
 describe("handleCallback: id_token attacks", () => {
-  const cases: Array<[string, Record<string, unknown>]> = [
+  const cases: Array<[string, TokenOverrides]> = [
     ["a different nonce", { nonce: "other-nonce" }],
     ["a missing nonce", { nonce: null }],
     ["a wrong audience", { aud: "someone-else" }],
@@ -1292,7 +1292,7 @@ git commit -m "feat(sso): signed session and login-state cookies, safe returnTo"
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FakeProvider } from "../test-support/fake-provider";
 import { verifySession } from "../session";
-import { createNextSso } from "./index";
+import { createNextSso, type NextSsoOptions } from "./index";
 
 const APP = "http://localhost:3000";
 const REDIRECT = `${APP}/auth/callback`;
@@ -1301,7 +1301,7 @@ let provider: FakeProvider;
 let app: ReturnType<typeof createNextSso>;
 let logins: string[];
 
-function build(patch: Record<string, unknown> = {}) {
+function build(patch: Partial<NextSsoOptions> = {}) {
   return createNextSso({
     issuer: provider.issuer,
     clientId: "app",
@@ -1423,7 +1423,7 @@ describe("callback handler", () => {
   });
 
   it("omits the id_token hint rather than overflowing the cookie (Review Focus 3)", async () => {
-    provider.profile.name = "a".repeat(700);
+    provider.profile.name = "a".repeat(1000); // ~4.4 KB session with the id_token, ~1.5 KB without
     const { oauthCookie, callbackUrl } = await beginLogin();
     const res = await app.handlers.callback(callbackRequest(callbackUrl, oauthCookie));
     const token = cookieValue(res, "versen_session")!;
@@ -1810,7 +1810,7 @@ Run:
 cd packages/sso && pnpm build && ls dist
 ```
 
-Expected files: `index.js index.cjs index.d.ts index.d.cts next.js next.cjs next.d.ts next.d.cts` (plus `.map` files).
+Expected files: `index.js index.cjs index.d.ts index.d.cts next.js next.cjs next.d.ts next.d.cts` (plus `.map` files, and possibly shared `chunk-*.js` files that tsup emits for the ESM build).
 
 Then prove the core does not need Next installed and both formats load:
 
