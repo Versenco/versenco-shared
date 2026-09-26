@@ -1,0 +1,51 @@
+name: Publish sso
+
+on:
+  push:
+    tags:
+      - "sso@*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm version is read from package.json's "packageManager" field —
+      # do not also set `version` here, pnpm/action-setup refuses to run
+      # when both are specified (ERR_PNPM_BAD_PM_VERSION).
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @versenco/sso test
+
+      - run: pnpm --filter @versenco/sso exec tsc --noEmit
+
+      - run: pnpm --filter @versenco/sso build
+
+      # npm now refuses direct publishes from this token (E_STAGE_REQUIRED):
+      # NPM_TOKEN is a Granular Access Token with "Read and write (stage only)",
+      # so CI can only STAGE a version. The version goes live once a maintainer
+      # approves it with 2FA — on npmjs.com, or from a terminal:
+      #   npm stage list @versenco/sso
+      #   npm stage approve <stage-id> --otp <code>
+      # Granular write tokens expire after at most 90 days (rotate by hand).
+      # `npm stage` needs npm >= 11.15, newer than the npm bundled with Node 22,
+      # and pnpm has no equivalent command, so the npm CLI does this step.
+      - name: Upgrade npm (staged publishing needs >= 11.15)
+        run: npm install -g "npm@^11.15.0"
+
+      - name: Stage for approval
+        working-directory: packages/sso
+        run: npm stage publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
