@@ -1,0 +1,47 @@
+{
+  "name": "@versenco/sso",
+  "version": "0.1.0",
+  "description": "Sign in with Versenco: OIDC client core and Next.js adapter for the Versenco SSO",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Versenco/versenco-shared.git",
+    "directory": "packages/sso"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+    },
+    "./next": {
+      "import": { "types": "./dist/next.d.ts", "default": "./dist/next.js" },
+      "require": { "types": "./dist/next.d.cts", "default": "./dist/next.cjs" }
+    }
+  },
+  "typesVersions": { "*": { "next": ["./dist/next.d.ts"] } },
+  "files": ["dist", "README.md", "LICENSE"],
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "jose": "^6.2.12",
+    "oauth4webapi": "^3.8.8"
+  },
+  "peerDependencies": { "next": ">=16" },
+  "peerDependenciesMeta": { "next": { "optional": true } },
+  "devDependencies": {
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
