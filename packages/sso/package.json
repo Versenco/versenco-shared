@@ -14,17 +14,41 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./next": {
-      "import": { "types": "./dist/next.d.ts", "default": "./dist/next.js" },
-      "require": { "types": "./dist/next.d.cts", "default": "./dist/next.cjs" }
+      "import": {
+        "types": "./dist/next.d.ts",
+        "default": "./dist/next.js"
+      },
+      "require": {
+        "types": "./dist/next.d.cts",
+        "default": "./dist/next.cjs"
+      }
     }
   },
-  "typesVersions": { "*": { "next": ["./dist/next.d.ts"] } },
-  "files": ["dist", "README.md", "LICENSE"],
-  "publishConfig": { "access": "public" },
+  "typesVersions": {
+    "*": {
+      "next": [
+        "./dist/next.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -34,9 +58,16 @@
     "jose": "^6.2.12",
     "oauth4webapi": "^3.8.8"
   },
-  "peerDependencies": { "next": ">=16" },
-  "peerDependenciesMeta": { "next": { "optional": true } },
+  "peerDependencies": {
+    "next": ">=16"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@types/node": "^26.6.3",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
