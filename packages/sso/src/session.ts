@@ -52,6 +52,8 @@ async function verify(secret: string, token: string, audience: string) {
   }
 }
 
+const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
 export function signSession(secret: string, data: SessionData, ttlSeconds: number, nowMs = Date.now()): Promise<string> {
   return sign(secret, { email: data.email, name: data.name, sid: data.sid, idt: data.idToken }, SESSION_AUDIENCE, ttlSeconds, nowMs, data.sub);
 }
@@ -61,10 +63,10 @@ export async function verifySession(secret: string, token: string): Promise<Sess
   if (!p || typeof p.sub !== "string" || typeof p.iat !== "number" || typeof p.exp !== "number") return null;
   return {
     sub: p.sub,
-    email: p.email as string | undefined,
-    name: p.name as string | undefined,
-    sid: p.sid as string | undefined,
-    idToken: p.idt as string | undefined,
+    email: str(p.email),
+    name: str(p.name),
+    sid: str(p.sid),
+    idToken: str(p.idt),
     iat: p.iat,
     exp: p.exp,
   };

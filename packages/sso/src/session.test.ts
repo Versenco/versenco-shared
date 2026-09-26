@@ -1,3 +1,4 @@
+import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 import {
   clearCookie,
@@ -71,6 +72,8 @@ describe("safeReturnTo (Review Focus 2)", () => {
     ["https://evil.com", "/"],
     ["javascript:alert(1)", "/"],
     ["/ok\nSet-Cookie: x=1", "/"],
+    ["\\evil.com", "/"],
+    ["/%09/evil", "/%09/evil"],
     ["", "/"],
     [null, "/"],
     [undefined, "/"],
@@ -94,5 +97,37 @@ describe("cookie helpers", () => {
     expect(jar.get("versen_session")).toBe("x.y.z");
     expect(jar.get("missing")).toBeUndefined();
     expect(parseCookies(null).size).toBe(0);
+  });
+});
+
+describe("audience separation and alg pinning", () => {
+  const key = new TextEncoder().encode(SECRET);
+  const now = Math.floor(Date.now() / 1000);
+  const sessionFields = { email: "a@b.c", name: "N", sid: "s" };
+  const oauthFields = { state: "s", nonce: "n", codeVerifier: "v", returnTo: "/" };
+  const mint = (aud: string, fields: Record<string, unknown>, sub?: string) => {
+    const jwt = new SignJWT(fields).setProtectedHeader({ alg: "HS256" }).setAudience(aud).setIssuedAt(now).setExpirationTime(now + 600);
+    if (sub) jwt.setSubject(sub);
+    return jwt.sign(key);
+  };
+
+  it("verifySession rejects an oauth-audience token even with a session-shaped payload", async () => {
+    expect(await verifySession(SECRET, await mint("versen-oauth", { ...sessionFields, ...oauthFields }, "user-1"))).toBeNull();
+  });
+
+  it("verifyOauthCookie rejects a session-audience token even with an oauth-shaped payload", async () => {
+    expect(await verifyOauthCookie(SECRET, await mint("versen-session", { ...sessionFields, ...oauthFields }, "user-1"))).toBeNull();
+  });
+
+  it("rejects alg:none and HS512 tokens in both verifiers", async () => {
+    const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const claims = { sub: "user-1", iat: now, exp: now + 600, ...sessionFields, ...oauthFields };
+    const none = (aud: string) => `${b64({ alg: "none", typ: "JWT" })}.${b64({ ...claims, aud })}.`;
+    const hs512 = (aud: string) =>
+      new SignJWT(claims).setProtectedHeader({ alg: "HS512" }).setAudience(aud).sign(key);
+    expect(await verifySession(SECRET, none("versen-session"))).toBeNull();
+    expect(await verifyOauthCookie(SECRET, none("versen-oauth"))).toBeNull();
+    expect(await verifySession(SECRET, await hs512("versen-session"))).toBeNull();
+    expect(await verifyOauthCookie(SECRET, await hs512("versen-oauth"))).toBeNull();
   });
 });
