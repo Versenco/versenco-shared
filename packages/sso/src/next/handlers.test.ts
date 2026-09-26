@@ -73,6 +73,14 @@ describe("login handler", () => {
   });
 });
 
+describe("login handler over https", () => {
+  it("marks the login-state cookie Secure", async () => {
+    app = build({ redirectUri: "https://app.example/auth/callback" });
+    const login = await app.handlers.login(new Request("https://app.example/auth/login"));
+    expect(setCookieLine(login, "versen_oauth")).toContain("Secure");
+  });
+});
+
 describe("callback handler", () => {
   it("creates a session, clears the login state and lands on returnTo", async () => {
     const { oauthCookie, callbackUrl } = await beginLogin("/dashboard");
@@ -121,6 +129,7 @@ describe("callback handler", () => {
     expect(second.status).toBe(302);
     expect(second.headers.get("location")).toBe(`${APP}/auth/error?code=token_exchange_failed`);
     expect(cookieValue(second, "versen_session")).toBeUndefined();
+    expect(setCookieLine(second, "versen_oauth")).toContain("Max-Age=0");
   });
 
   it("creates no session when onLogin throws", async () => {
@@ -129,6 +138,25 @@ describe("callback handler", () => {
     const res = await app.handlers.callback(callbackRequest(callbackUrl, oauthCookie));
     expect(res.headers.get("location")).toBe(`${APP}/auth/error?code=login_rejected`);
     expect(cookieValue(res, "versen_session")).toBeUndefined();
+    expect(setCookieLine(res, "versen_oauth")).toContain("Max-Age=0");
+  });
+
+  it("rejects a callback whose state belongs to a different login", async () => {
+    const a = await beginLogin();
+    const b = await beginLogin();
+    const res = await app.handlers.callback(callbackRequest(b.callbackUrl, a.oauthCookie));
+    expect(res.headers.get("location")).toBe(`${APP}/auth/error?code=invalid_state`);
+    expect(cookieValue(res, "versen_session")).toBeUndefined();
+    expect(setCookieLine(res, "versen_oauth")).toContain("Max-Age=0");
+  });
+
+  it("fails cleanly when the session cannot fit in a cookie even without the id_token", async () => {
+    provider.profile.name = "a".repeat(6000);
+    const { oauthCookie, callbackUrl } = await beginLogin();
+    const res = await app.handlers.callback(callbackRequest(callbackUrl, oauthCookie));
+    expect(res.headers.get("location")).toBe(`${APP}/auth/error?code=config_invalid`);
+    expect(cookieValue(res, "versen_session")).toBeUndefined();
+    expect(setCookieLine(res, "versen_oauth")).toContain("Max-Age=0");
   });
 
   it("omits the id_token hint rather than overflowing the cookie (Review Focus 3)", async () => {

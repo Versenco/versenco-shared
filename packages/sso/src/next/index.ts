@@ -45,7 +45,7 @@ export function createNextSso(options: NextSsoOptions) {
   const appUrl = new URL(options.redirectUri);
   const secure = !(appUrl.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(appUrl.hostname));
   const errorPath = options.errorPath ?? "/auth/error";
-  const home = options.defaultReturnTo ?? "/";
+  const home = safeReturnTo(options.defaultReturnTo ?? "/");
 
   function redirectTo(target: string, cookies: string[] = []): Response {
     const headers = new Headers({ location: new URL(target, appUrl).href, "cache-control": "no-store" });
@@ -95,6 +95,9 @@ export function createNextSso(options: NextSsoOptions) {
         const base = { sub: result.claims.sub, email: result.claims.email, name: result.claims.name, sid: result.claims.sid };
         let token = await signSession(secret, { ...base, idToken: result.idToken }, ttl);
         if (token.length > MAX_SESSION_TOKEN_LENGTH) token = await signSession(secret, base, ttl);
+        if (token.length > MAX_SESSION_TOKEN_LENGTH) {
+          throw new SsoError("config_invalid", "Session cookie would exceed the browser size limit");
+        }
 
         return redirectTo(safeReturnTo(saved.returnTo), [
           serializeCookie(cookieNames.session, token, { maxAge: ttl, secure }),
