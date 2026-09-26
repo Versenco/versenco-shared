@@ -46,8 +46,12 @@
     "README.md",
     "LICENSE"
   ],
+  "engines": {
+    "node": ">=20.19"
+  },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "build": "tsup",

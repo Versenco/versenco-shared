@@ -29,6 +29,7 @@ export const { handlers, getSession, requireSession, getSessionFromRequest } = c
   sessionSecret: process.env.SESSION_SECRET!, // at least 32 bytes, e.g. `openssl rand -base64 32`
   // Create or update your own user record. Throwing aborts the sign-in.
   onLogin: async (claims) => {
+    // Check claims.email_verified yourself before trusting claims.email to link or merge accounts.
     await db.user.upsert({ where: { ssoId: claims.sub }, update: {}, create: { ssoId: claims.sub, email: claims.email } });
   },
 });
@@ -48,6 +49,7 @@ export const GET = handlers.callback;
 // app/auth/logout/route.ts
 import { handlers } from "@/lib/sso";
 export const GET = handlers.logout;
+export const POST = handlers.logout;
 ```
 
 Use the session in Server Components and route handlers:
@@ -70,14 +72,15 @@ import { getSessionFromRequest } from "@/lib/sso";
 export async function proxy(request: Request) {
   if (!(await getSessionFromRequest(request))) {
     const url = new URL("/auth/login", request.url);
-    url.searchParams.set("returnTo", new URL(request.url).pathname);
+    const { pathname, search } = new URL(request.url);
+    url.searchParams.set("returnTo", pathname + search);
     return NextResponse.redirect(url);
   }
 }
 export const config = { matcher: ["/dashboard/:path*"] };
 ```
 
-Failed sign-ins redirect to `/auth/error?code=<code>` (change with `errorPath`). Codes: `invalid_state`, `authorization_failed`, `token_exchange_failed`, `invalid_id_token`, `discovery_failed`, `login_rejected`.
+Failed sign-ins redirect to `/auth/error?code=<code>` (change with `errorPath`). Codes: `invalid_state`, `authorization_failed`, `token_exchange_failed`, `invalid_id_token`, `discovery_failed`, `login_rejected`, `config_invalid`.
 
 ### Options
 
@@ -117,6 +120,10 @@ Every failure is an `SsoError` with a stable `code`. Messages never contain secr
 - Cookie names have no `__Host-` prefix (it would break `http://localhost` development). A sibling `*.versenco.com` subdomain could therefore plant a cookie with the same name; the effect is a sign-in failure or login CSRF, and a planted session is still rejected without a valid HMAC. Use a distinct `cookiePrefix` per app.
 - Logout is a GET with no CSRF protection, so a cross-site page can sign a user out.
 - The SSO issues no refresh token: the session is 8 h absolute.
+- Sessions are stateless: logout clears the browser cookie but does not invalidate a copy of it, which stays valid until it expires (up to 8 h by default).
+- There is no back-channel logout in v1: signing out at the SSO from another app does not sign users out here.
+- `session.idToken` is never returned by `getSession`, `requireSession` or `getSessionFromRequest`; it stays inside the cookie for logout only.
+- CJS consumers can load two copies of the package, so compare `err.code` rather than using `instanceof SsoError`.
 
 ## License
 

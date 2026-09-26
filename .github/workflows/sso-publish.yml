@@ -24,6 +24,14 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
+      - name: Tag must match packages/sso/package.json version
+        run: |
+          expected="sso@$(node -p "require('./packages/sso/package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version ($expected)" >&2
+            exit 1
+          fi
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm --filter @versenco/sso test
