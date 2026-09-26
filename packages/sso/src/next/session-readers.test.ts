@@ -66,7 +66,7 @@ describe("requireSession", () => {
 
   it("carries a safe returnTo and drops an unsafe one", async () => {
     await expect(app.requireSession("/billing?tab=2")).rejects.toThrow("NEXT_REDIRECT:/auth/login?returnTo=%2Fbilling%3Ftab%3D2");
-    await expect(app.requireSession("//evil.com")).rejects.toThrow("NEXT_REDIRECT:/auth/login?returnTo=%2F");
+    await expect(app.requireSession("//evil.com")).rejects.toThrow(/^NEXT_REDIRECT:\/auth\/login\?returnTo=%2F$/);
   });
 });
 
