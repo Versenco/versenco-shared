@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { assertSessionSecret, type SsoConfig } from "../config";
 import { createSso, type IdentityClaims, type Sso } from "../core";
 import { SsoError } from "../errors";
@@ -10,6 +12,7 @@ import {
   signSession,
   verifyOauthCookie,
   verifySession,
+  type Session,
 } from "../session";
 
 export interface NextSsoOptions extends SsoConfig {
@@ -122,7 +125,26 @@ export function createNextSso(options: NextSsoOptions) {
     },
   };
 
-  return { sso, handlers, cookieNames };
+  const loginPath = options.loginPath ?? "/auth/login";
+
+  async function getSession(): Promise<Session | null> {
+    const raw = (await cookies()).get(cookieNames.session)?.value;
+    return raw ? verifySession(secret, raw) : null;
+  }
+
+  async function requireSession(returnTo?: string): Promise<Session> {
+    const session = await getSession();
+    if (session) return session;
+    redirect(returnTo === undefined ? loginPath : `${loginPath}?returnTo=${encodeURIComponent(safeReturnTo(returnTo))}`);
+  }
+
+  /** For proxy.ts, where `cookies()` from next/headers is unavailable. */
+  async function getSessionFromRequest(req: Request): Promise<Session | null> {
+    const raw = parseCookies(req.headers.get("cookie")).get(cookieNames.session);
+    return raw ? verifySession(secret, raw) : null;
+  }
+
+  return { sso, handlers, cookieNames, getSession, requireSession, getSessionFromRequest };
 }
 
 export type { IdentityClaims } from "../core";
