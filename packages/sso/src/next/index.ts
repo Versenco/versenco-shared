@@ -12,8 +12,24 @@ import {
   signSession,
   verifyOauthCookie,
   verifySession,
-  type Session,
+  type Session as InternalSession,
 } from "../session";
+
+/** What the readers return. The id_token stays inside the cookie and is never handed to app code. */
+export type Session = Omit<InternalSession, "idToken">;
+
+function publicSession(session: InternalSession | null): Session | null {
+  if (!session) return null;
+  const { idToken: _idToken, ...rest } = session;
+  return rest;
+}
+
+/** Appends a query parameter, respecting a query string already present in `path`. */
+function withParam(path: string, key: string, value: string): string {
+  const url = new URL(path, "http://placeholder.invalid");
+  url.searchParams.set(key, value);
+  return url.pathname + url.search;
+}
 
 export interface NextSsoOptions extends SsoConfig {
   /** At least 32 bytes. Signs the session and login-state cookies. */
@@ -40,6 +56,12 @@ const LOGIN_STATE_TTL_SECONDS = 600;
 
 export function createNextSso(options: NextSsoOptions) {
   assertSessionSecret(options.sessionSecret);
+  if (options.sessionTtlSeconds !== undefined && !(Number.isInteger(options.sessionTtlSeconds) && options.sessionTtlSeconds > 0)) {
+    throw new SsoError("config_invalid", "sessionTtlSeconds must be a positive integer");
+  }
+  if (options.cookiePrefix !== undefined && !/^[A-Za-z0-9_-]+$/.test(options.cookiePrefix)) {
+    throw new SsoError("config_invalid", "cookiePrefix may only contain letters, digits, '_' and '-'");
+  }
   const sso: Sso = createSso(options);
   const secret = options.sessionSecret;
   const prefix = options.cookiePrefix ?? "versen";
@@ -57,7 +79,7 @@ export function createNextSso(options: NextSsoOptions) {
   }
 
   function fail(error: SsoError, cookies: string[] = []): Response {
-    return redirectTo(`${errorPath}?code=${error.code}`, cookies);
+    return redirectTo(withParam(errorPath, "code", error.code), cookies);
   }
 
   const handlers = {
@@ -129,19 +151,19 @@ export function createNextSso(options: NextSsoOptions) {
 
   async function getSession(): Promise<Session | null> {
     const raw = (await cookies()).get(cookieNames.session)?.value;
-    return raw ? verifySession(secret, raw) : null;
+    return raw ? publicSession(await verifySession(secret, raw)) : null;
   }
 
   async function requireSession(returnTo?: string): Promise<Session> {
     const session = await getSession();
     if (session) return session;
-    redirect(returnTo === undefined ? loginPath : `${loginPath}?returnTo=${encodeURIComponent(safeReturnTo(returnTo))}`);
+    redirect(returnTo === undefined ? loginPath : withParam(loginPath, "returnTo", safeReturnTo(returnTo)));
   }
 
   /** For proxy.ts, where `cookies()` from next/headers is unavailable. */
   async function getSessionFromRequest(req: Request): Promise<Session | null> {
     const raw = parseCookies(req.headers.get("cookie")).get(cookieNames.session);
-    return raw ? verifySession(secret, raw) : null;
+    return raw ? publicSession(await verifySession(secret, raw)) : null;
   }
 
   return { sso, handlers, cookieNames, getSession, requireSession, getSessionFromRequest };
@@ -150,4 +172,3 @@ export function createNextSso(options: NextSsoOptions) {
 export type { IdentityClaims } from "../core";
 export { SsoError } from "../errors";
 export type { SsoErrorCode } from "../errors";
-export type { Session } from "../session";

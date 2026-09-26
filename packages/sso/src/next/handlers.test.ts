@@ -79,6 +79,46 @@ describe("login handler over https", () => {
     const login = await app.handlers.login(new Request("https://app.example/auth/login"));
     expect(setCookieLine(login, "versen_oauth")).toContain("Secure");
   });
+
+  it("marks the session cookie Secure on an https callback, and not on loopback http", async () => {
+    const httpsApp = "https://app.example";
+    const p2 = await FakeProvider.start({ clientId: "app", clientSecret: "secret", redirectUri: `${httpsApp}/auth/callback` });
+    try {
+      app = build({ issuer: p2.issuer, redirectUri: `${httpsApp}/auth/callback` });
+      const login = await app.handlers.login(new Request(`${httpsApp}/auth/login`));
+      const cb = p2.authorize(login.headers.get("location")!);
+      const res = await app.handlers.callback(callbackRequest(cb, cookieValue(login, "versen_oauth")));
+      expect(setCookieLine(res, "versen_session")).toContain("Secure");
+      expect(setCookieLine(res, "versen_oauth")).toContain("Secure");
+    } finally {
+      await p2.stop();
+    }
+    app = build();
+    const { oauthCookie, callbackUrl } = await beginLogin();
+    const res = await app.handlers.callback(callbackRequest(callbackUrl, oauthCookie));
+    expect(setCookieLine(res, "versen_session")).not.toContain("Secure");
+  });
+});
+
+describe("startup validation", () => {
+  it.each([0, -1, 1.5, Number.NaN])("rejects sessionTtlSeconds %s", (ttl) => {
+    expect(() => build({ sessionTtlSeconds: ttl })).toThrowError(expect.objectContaining({ code: "config_invalid" }));
+  });
+  it.each(["", "a b", "a;b", "a=b", "é"])("rejects cookiePrefix %j", (prefix) => {
+    expect(() => build({ cookiePrefix: prefix })).toThrowError(expect.objectContaining({ code: "config_invalid" }));
+  });
+  it("accepts a custom valid ttl and prefix", () => {
+    expect(() => build({ sessionTtlSeconds: 60, cookiePrefix: "my-app_1" })).not.toThrow();
+  });
+});
+
+describe("paths that already carry a query string", () => {
+  it("appends code= with & to errorPath", async () => {
+    app = build({ errorPath: "/oops?x=1" });
+    const { callbackUrl } = await beginLogin();
+    const res = await app.handlers.callback(callbackRequest(callbackUrl));
+    expect(res.headers.get("location")).toBe(`${APP}/oops?x=1&code=invalid_state`);
+  });
 });
 
 describe("callback handler", () => {
@@ -94,6 +134,7 @@ describe("callback handler", () => {
     expect(sessionLine).toContain("HttpOnly");
     expect(sessionLine).toContain("SameSite=Lax");
     expect(sessionLine).toContain("Max-Age=28800");
+    expect(sessionLine).not.toContain("Secure");
     const session = await verifySession(SECRET, cookieValue(res, "versen_session")!);
     expect(session).toMatchObject({ sub: "user-123", email: "user@example.com", sid: "sid-1" });
     expect(session!.idToken).toBeDefined();

@@ -80,3 +80,27 @@ describe("getSessionFromRequest (for proxy.ts)", () => {
     expect(await app.getSessionFromRequest(new Request(`${APP}/dashboard`))).toBeNull();
   });
 });
+
+describe("id_token is never exposed", () => {
+  const withIdt = () => signSession(SECRET, { sub: "user-123", idToken: "secret.id.token" }, 3600);
+
+  it("getSession, requireSession and getSessionFromRequest omit idToken", async () => {
+    const token = await withIdt();
+    jar.set("versen_session", token);
+    expect(await app.getSession()).not.toHaveProperty("idToken");
+    expect(await app.requireSession()).not.toHaveProperty("idToken");
+    const request = new Request(`${APP}/x`, { headers: { cookie: `versen_session=${token}` } });
+    expect(await app.getSessionFromRequest(request)).not.toHaveProperty("idToken");
+  });
+});
+
+describe("loginPath with a query string", () => {
+  it("appends returnTo with &", async () => {
+    const a = createNextSso({
+      issuer: provider.issuer, clientId: "app", clientSecret: "secret",
+      redirectUri: `${APP}/auth/callback`, sessionSecret: SECRET, loginPath: "/signin?ui=1",
+    });
+    await expect(a.requireSession("/x")).rejects.toThrow("NEXT_REDIRECT:/signin?ui=1&returnTo=%2Fx");
+    await expect(a.requireSession()).rejects.toThrow("NEXT_REDIRECT:/signin?ui=1");
+  });
+});
